@@ -322,7 +322,7 @@ public Action Delay(Handle timer)
 			}
 		}
 	}
-	else if (Cikan <= 52)
+	else if (Cikan <= 51)
 	{
 		Log("Rulet Kırmızı Çıktı.");
 		G8 = G7;
