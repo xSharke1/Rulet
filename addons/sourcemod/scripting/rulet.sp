@@ -55,8 +55,6 @@ public void OnPluginStart()
 
 public void OnMapStart()
 {
-	PrecacheSoundAny("misc/store_roulette/spinning.mp3");
-	AddFileToDownloadsTable("sound/misc/store_roulette/spinning.mp3");
 	PrecacheSoundAny("misc/store_roulette/winner.mp3");
 	AddFileToDownloadsTable("sound/misc/store_roulette/winner.mp3");
 }
@@ -95,16 +93,9 @@ public Action RuletAcikla(Handle timer)
 {
 	Zamanlayici = null;
 	Block = true;
-	LoopClients(i)
-	{
-		if (RG[i])
-		{
-			EmitSoundToClientAny(i, "misc/store_roulette/spinning.mp3", SOUND_FROM_PLAYER, 1, 100);
-		}
-	}
 	Log("--------------------- Rulet Açıklanacak ---------------------");
 	PrintToChatAll("[SM] \x04Rulet birazdan açıklanacak.");
-	CreateTimer(4.1, Delay, _, TIMER_FLAG_NO_MAPCHANGE);
+	CreateTimer(2.0, Delay, _, TIMER_FLAG_NO_MAPCHANGE);
 	return Plugin_Stop;
 }
 
@@ -274,16 +265,9 @@ public Action RoundEnd(Event event, const char[] name, bool db)
 	if (!Mod.BoolValue)
 	{
 		Block = true;
-		LoopClients(i)
-		{
-			if (RG[i])
-			{
-				EmitSoundToClientAny(i, "misc/store_roulette/spinning.mp3", SOUND_FROM_PLAYER, 1, 100);
-			}
-		}
 		Log("--------------------- Rulet Açıklanacak ---------------------");
 		PrintToChatAll("[SM] \x04Rulet birazdan açıklanacak.");
-		CreateTimer(4.1, Delay, _, TIMER_FLAG_NO_MAPCHANGE);
+		CreateTimer(2.0, Delay, _, TIMER_FLAG_NO_MAPCHANGE);
 	}
 }
 
@@ -405,12 +389,6 @@ public Action RoundStart(Event event, const char[] name, bool db)
 {
 	if (!Mod.BoolValue)
 	{
-		LoopClients(i)
-		{
-			Rulet[i] = 0;
-			YG[i] = false, KG[i] = false, SG[i] = false, RG[i] = false;
-		}
-		YY = 0, KY = 0, SY = 0;
 		Log("--------------------- Rulet Açıldı ---------------------");
 		Block = false;
 	}
