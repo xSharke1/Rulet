@@ -1,5 +1,5 @@
 #include <sourcemod>
-#include <emitsoundany>
+#include <sdktools_stringtables>
 #include <store>
 
 #pragma semicolon 1
@@ -8,8 +8,8 @@
 ConVar Yesilx = null, Kirmizix = null, Siyahx = null, Max = null, Min = null, Mod = null, Timeri = null;
 int YY = 0, KY = 0, SY = 0;
 char G1[20] = "X", G2[20] = "X", G3[20] = "X", G4[20] = "X", G5[20] = "X", G6[20] = "X", G7[20] = "X", G8[20] = "X";
-int Rulet[65] =  { 0, ... };
-bool YG[65] =  { false, ... }, KG[65] =  { false, ... }, SG[65] =  { false, ... }, RG[65] =  { false, ... };
+int Rulet[65] = { 0, ... };
+bool YG[65] = { false, ... }, KG[65] = { false, ... }, SG[65] = { false, ... }, RG[65] = { false, ... };
 bool Block = false;
 Handle Zamanlayici = null;
 
@@ -99,17 +99,37 @@ public Action RuletAcikla(Handle timer)
 	return Plugin_Stop;
 }
 
+public void OnClientPostAdminCheck(int client)
+{
+	YG[client] = false;
+	KG[client] = false;
+	SG[client] = false;
+	RG[client] = false;
+	Rulet[client] = 0;
+}
+
 public void OnClientDisconnect(int client)
 {
 	if (RG[client])
 	{
 		Log("%N Ruleti unuttu %d Kredi kaybetti.", client, Rulet[client]);
 		if (YG[client])
+		{
+			YG[client] = false;
 			YY--;
+		}
 		else if (KG[client])
+		{
+			KG[client] = false;
 			KY--;
+		}
 		else if (SG[client])
+		{
+			SG[client] = false;
 			SY--;
+		}
+		RG[client] = false;
+		Rulet[client] = 0;
 	}
 }
 
@@ -153,7 +173,7 @@ public Action Command_Rulet(int client, int args)
 			return Plugin_Handled;
 		}
 		int Kredi = Store_GetClientCredits(client);
-		if (Kredi < Yatirilan)
+		if (Yatirilan > Kredi)
 		{
 			ReplyToCommand(client, "[SM] \x10Yeterli kredin yok, \x04mevcut kredin: %d", Kredi);
 			return Plugin_Handled;
@@ -295,7 +315,7 @@ public Action Delay(Handle timer)
 				{
 					Log("%N Yeşil katladı %d kredi kazandı", i, Rulet[i] * Yesilx.IntValue);
 					Store_SetClientCredits(i, Store_GetClientCredits(i) + Rulet[i] * Yesilx.IntValue);
-					EmitSoundToClientAny(i, "misc/store_roulette/winner.mp3", SOUND_FROM_PLAYER, 1, 100);
+					ClientCommand(i, "play misc/store_roulette/winner.mp3");
 					PrintToChat(i, "[SM] \x04Yeşilden \x0E%d Kredi \x01kazandın.", Rulet[i] * Yesilx.IntValue);
 				}
 				else
@@ -327,7 +347,7 @@ public Action Delay(Handle timer)
 				{
 					Log("%N Kırmızı katladı %d kredi kazandı", i, Rulet[i] * Kirmizix.IntValue);
 					Store_SetClientCredits(i, Store_GetClientCredits(i) + Rulet[i] * Kirmizix.IntValue);
-					EmitSoundToClientAny(i, "misc/store_roulette/winner.mp3", SOUND_FROM_PLAYER, 1, 100);
+					ClientCommand(i, "play misc/store_roulette/winner.mp3");
 					PrintToChat(i, "[SM] \x07Kırmızıdan \x0E%d Kredi \x01kazandın.", Rulet[i] * Kirmizix.IntValue);
 				}
 				else
@@ -359,7 +379,7 @@ public Action Delay(Handle timer)
 				{
 					Log("%N Siyah katladı %d kredi kazandı", i, Rulet[i] * Siyahx.IntValue);
 					Store_SetClientCredits(i, Store_GetClientCredits(i) + Rulet[i] * Siyahx.IntValue);
-					EmitSoundToClientAny(i, "misc/store_roulette/winner.mp3", SOUND_FROM_PLAYER, 1, 100);
+					ClientCommand(i, "play misc/store_roulette/winner.mp3");
 					PrintToChat(i, "[SM] \x08Siyahtan \x0E%d Kredi \x01kazandın.", Rulet[i] * Siyahx.IntValue);
 				}
 				else
@@ -378,7 +398,7 @@ public Action Delay(Handle timer)
 	YY = 0, KY = 0, SY = 0;
 	if (Mod.BoolValue)
 	{
-		Log("--------------------- Rulet Açıldı ---------------------");
+		Log("--------------------- Rulet Başladı ---------------------");
 		Block = false;
 		Zamanlayici = CreateTimer(Timeri.FloatValue - 10.0, Duyur, _, TIMER_FLAG_NO_MAPCHANGE);
 	}
@@ -389,7 +409,7 @@ public Action RoundStart(Event event, const char[] name, bool db)
 {
 	if (!Mod.BoolValue)
 	{
-		Log("--------------------- Rulet Açıldı ---------------------");
+		Log("--------------------- Rulet Başladı ---------------------");
 		Block = false;
 	}
 }
@@ -425,4 +445,31 @@ void TimerKapat()
 		delete Zamanlayici;
 		Zamanlayici = null;
 	}
+}
+
+bool PrecacheSoundAny(const char[] szPath, bool preload = false)
+{
+	bool g_bNeedsFakePrecache = false;
+	EngineVersion g_engineversion = GetEngineVersion();
+	if (g_engineversion == Engine_CSGO || g_engineversion == Engine_DOTA)
+	{
+		g_bNeedsFakePrecache = true;
+	}
+	if (g_bNeedsFakePrecache)
+	{
+		return FakePrecacheSoundEx(szPath);
+	}
+	else
+	{
+		return PrecacheSound(szPath, preload);
+	}
+}
+
+static bool FakePrecacheSoundEx(const char[] szPath)
+{
+	char szPathStar[256];
+	Format(szPathStar, sizeof(szPathStar), "*%s", szPath);
+	
+	AddToStringTable(FindStringTable("soundprecache"), szPathStar);
+	return true;
 } 
