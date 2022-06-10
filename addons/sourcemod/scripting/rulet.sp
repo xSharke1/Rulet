@@ -1,475 +1,216 @@
 #include <sourcemod>
-#include <sdktools_stringtables>
 #include <store>
 
 #pragma semicolon 1
 #pragma newdecls required
-
-ConVar Yesilx = null, Kirmizix = null, Siyahx = null, Max = null, Min = null, Mod = null, Timeri = null;
-int YY = 0, KY = 0, SY = 0;
-char G1[20] = "X", G2[20] = "X", G3[20] = "X", G4[20] = "X", G5[20] = "X", G6[20] = "X", G7[20] = "X", G8[20] = "X";
-int Rulet[65] = { 0, ... };
-bool YG[65] = { false, ... }, KG[65] = { false, ... }, SG[65] = { false, ... }, RG[65] = { false, ... };
-bool Block = false;
-Handle Zamanlayici = null;
 
 public Plugin myinfo = 
 {
 	name = "Rulet", 
 	author = "ByDexter", 
 	description = "", 
-	version = "1.1", 
+	version = "1.0", 
 	url = "https://steamcommunity.com/id/ByDexterTR - ByDexter#5494"
 };
 
-#define LoopClients(%1) for (int %1 = 1; %1 <= MaxClients; %1++) if (IsClientInGame(%1))
+ConVar min_bahis = null, max_bahis = null;
+int Bahis[65][2];
+char History[9][16];
+int Bahisler[3];
+
 
 public void OnPluginStart()
 {
-	if (GetConVarInt(FindConVar("mp_round_restart_delay")) < 5)
-		SetCvar("mp_round_restart_delay", 6);
-	
-	Yesilx = CreateConVar("sm_rulet_yesilkati", "14", "Yeşil tutturan oyuncu kaç kat kredi kazansın", 0, true, 1.0, false);
-	Kirmizix = CreateConVar("sm_rulet_kirmizikati", "2", "Kırmızı tutturan oyuncu kaç kat kredi kazansın", 0, true, 1.0, false);
-	Siyahx = CreateConVar("sm_rulet_siyahkati", "2", "Siyah tutturan oyuncu kaç kat kredi kazansın", 0, true, 1.0, false);
-	Max = CreateConVar("sm_rulet_max", "1000", "Rulete en fazla girelecek", 0, true, 1.0, false);
-	Min = CreateConVar("sm_rulet_min", "100", "Rulete en az girelecek", 0, true, 1.0, false);
-	Timeri = CreateConVar("sm_rulet_saniye", "120.0", "Eğer rulet mod 1 ise kaç saniye arayla açıklanısn", 0, true, 11.0, false);
-	Mod = CreateConVar("sm_rulet_mod", "0", "Rulet Mod [ 0 = Tur Sonu Açıklansın | 1 = X saniye Sonra Açıklansın ]", 0, true, 0.0, true, 1.0);
-	Timeri.AddChangeHook(TimerHook);
-	Mod.AddChangeHook(ModHook);
-	if (Mod.BoolValue)
+	if (FindConVar("mp_round_restart_delay").IntValue < 3)
 	{
-		TimerKapat();
-		Zamanlayici = CreateTimer(Timeri.FloatValue - 10.0, Duyur, _, TIMER_FLAG_NO_MAPCHANGE);
+		SetConVarInt(FindConVar("mp_round_restart_delay"), 3, true, false);
 	}
-	else
-	{
-		TimerKapat();
-	}
-	RegConsoleCmd("sm_rulet", Command_Rulet);
+	min_bahis = CreateConVar("sm_rulet_min_bahis", "50", "En az rulette kaç kredi oynansın", 0, true, 1.0);
+	max_bahis = CreateConVar("sm_rulet_max_bahis", "150", "En fazla rulette kaç kredi oynansın", 0, true, 1.0);
+	RegConsoleCmd("sm_rulet", Command_Rulet, "");
 	HookEvent("round_end", RoundEnd);
-	HookEvent("round_start", RoundStart);
-	AutoExecConfig(true, "Rulet", "ByDexter");
+	AutoExecConfig(true, "ByDexter", "Rulet");
+	for (int i = 1; i <= MaxClients; i++)if (IsValidClient(i))
+	{
+		OnClientPostAdminCheck(i);
+	}
 }
 
 public void OnMapStart()
 {
-	PrecacheSoundAny("misc/store_roulette/winner.mp3");
-	AddFileToDownloadsTable("sound/misc/store_roulette/winner.mp3");
-}
-
-public void TimerHook(ConVar convar, const char[] oldValue, const char[] newValue)
-{
-	if (Mod.BoolValue)
+	for (int i = 0; i < 9; i++)
 	{
-		TimerKapat();
-		Zamanlayici = CreateTimer(Timeri.FloatValue - 10.0, Duyur, _, TIMER_FLAG_NO_MAPCHANGE);
+		History[i] = "X";
 	}
-}
-
-public void ModHook(ConVar convar, const char[] oldValue, const char[] newValue)
-{
-	if (Mod.BoolValue)
+	for (int i = 0; i < 3; i++)
 	{
-		TimerKapat();
-		Zamanlayici = CreateTimer(Timeri.FloatValue - 10.0, Duyur, _, TIMER_FLAG_NO_MAPCHANGE);
+		Bahisler[i] = 0;
 	}
-	else
-	{
-		TimerKapat();
-	}
-}
-
-public Action Duyur(Handle timer)
-{
-	PrintToChatAll("[SM] \x10Ruletin açıklanmasına son \x0410 Saniye");
-	Zamanlayici = null;
-	Zamanlayici = CreateTimer(10.0, RuletAcikla, _, TIMER_FLAG_NO_MAPCHANGE);
-	return Plugin_Stop;
-}
-
-public Action RuletAcikla(Handle timer)
-{
-	Zamanlayici = null;
-	Block = true;
-	Log("--------------------- Rulet Açıklanacak ---------------------");
-	PrintToChatAll("[SM] \x04Rulet birazdan açıklanacak.");
-	CreateTimer(2.0, Delay, _, TIMER_FLAG_NO_MAPCHANGE);
-	return Plugin_Stop;
 }
 
 public void OnClientPostAdminCheck(int client)
 {
-	YG[client] = false;
-	KG[client] = false;
-	SG[client] = false;
-	RG[client] = false;
-	Rulet[client] = 0;
-}
-
-public void OnClientDisconnect(int client)
-{
-	if (RG[client])
-	{
-		Log("%N Ruleti unuttu %d Kredi kaybetti.", client, Rulet[client]);
-		if (YG[client])
-		{
-			YG[client] = false;
-			YY--;
-		}
-		else if (KG[client])
-		{
-			KG[client] = false;
-			KY--;
-		}
-		else if (SG[client])
-		{
-			SG[client] = false;
-			SY--;
-		}
-		RG[client] = false;
-		Rulet[client] = 0;
-	}
+	Bahis[client][0] = 0;
+	Bahis[client][1] = 0;
 }
 
 public Action Command_Rulet(int client, int args)
 {
-	if (Block)
+	bool Oynat = true;
+	if (Bahis[client][1] > 0)
 	{
-		ReplyToCommand(client, "[SM] \x02Rulet şuan kapalı.");
-		return Plugin_Handled;
+		Oynat = false;
 	}
-	if (args < 1)
+	
+	Menu menu = new Menu(Menu_callback);
+	
+	if (Oynat)
 	{
-		char Item[128];
-		Panel panel = new Panel();
-		panel.SetTitle("Rulet");
-		panel.DrawText("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬");
-		Format(Item, 128, "Geçmiş: > %s < - %s - %s - %s - %s - %s - %s - %s", G1, G2, G3, G4, G5, G6, G7, G8);
-		panel.DrawText(Item);
-		Format(Item, 128, "Oyuncular: Y %d - K %d - S %d", YY, KY, SY);
-		panel.DrawText(Item);
-		panel.DrawText("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬");
-		Format(Item, 128, "➔ Yeşil(%dx)", Yesilx.IntValue);
-		panel.DrawItem(Item, ITEMDRAW_DISABLED);
-		Format(Item, 128, "➔ Kırmızı(%dx)", Kirmizix.IntValue);
-		panel.DrawItem(Item, ITEMDRAW_DISABLED);
-		Format(Item, 128, "➔ Siyah(%dx)\n ", Siyahx.IntValue);
-		panel.DrawItem(Item, ITEMDRAW_DISABLED);
-		panel.DrawItem("➔ Kapat");
-		panel.Send(client, Panel_CallBack2, 20);
-		delete panel;
-		return Plugin_Handled;
-	}
-	if (!RG[client])
-	{
-		char Arg1[128];
-		GetCmdArg(1, Arg1, 128);
-		int Yatirilan = StringToInt(Arg1);
-		if (Yatirilan < Min.IntValue || Yatirilan > Max.IntValue)
+		char arg1[32];
+		GetCmdArg(1, arg1, 32);
+		
+		int bahis = StringToInt(arg1);
+		int kredi = Store_GetClientCredits(client);
+		
+		if (bahis < min_bahis.IntValue || bahis > max_bahis.IntValue)
 		{
-			ReplyToCommand(client, "[SM] Kullanım: sm_rulet <%d-%d>", Min.IntValue, Max.IntValue);
+			ReplyToCommand(client, "[SM] Rulete en az %d, en fazla %d oynayabilirsin.", min_bahis.IntValue, max_bahis.IntValue);
 			return Plugin_Handled;
 		}
-		int Kredi = Store_GetClientCredits(client);
-		if (Yatirilan > Kredi)
+		
+		if (kredi < bahis)
 		{
-			ReplyToCommand(client, "[SM] \x10Yeterli kredin yok, \x04mevcut kredin: %d", Kredi);
+			ReplyToCommand(client, "[SM] Bu kadar kredin bulunmuyor, kredin: %d", kredi);
 			return Plugin_Handled;
 		}
-		Rulet[client] = Yatirilan;
-		char Item[128];
-		Panel panel = new Panel();
-		Format(Item, 128, "Rulet - %d Kredi", Yatirilan);
-		panel.SetTitle(Item);
-		panel.DrawText("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬");
-		Format(Item, 128, "Geçmiş: > %s < - %s - %s - %s - %s - %s - %s - %s", G1, G2, G3, G4, G5, G6, G7, G8);
-		panel.DrawText(Item);
-		Format(Item, 128, "Oyuncular: Y %d - K %d - S %d", YY, KY, SY);
-		panel.DrawText(Item);
-		panel.DrawText("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬");
-		Format(Item, 128, "➔ Yeşil(%dx)", Yesilx.IntValue);
-		panel.DrawItem(Item);
-		Format(Item, 128, "➔ Kırmızı(%dx)", Kirmizix.IntValue);
-		panel.DrawItem(Item);
-		Format(Item, 128, "➔ Siyah(%dx)\n ", Siyahx.IntValue);
-		panel.DrawItem(Item);
-		panel.DrawItem("➔ Kapat");
-		panel.Send(client, Panel_CallBack, 20);
-		delete panel;
-		return Plugin_Handled;
+		
+		Bahis[client][0] = bahis;
+		
+		menu.SetTitle("ByDexter ★ Rulet\nBahisler: K: %d S: %d Y: %d\nBahisin: %d\nGeçmiş: %s - %s - %s - %s - %s - %s - %s - %s - %s\n ", bahis, Bahisler[0], Bahisler[1], Bahisler[2], History[8], History[7], History[6], History[5], History[4], History[3], History[2], History[1], History[0]);
+		menu.AddItem("1", "Kırmızı (2x)");
+		menu.AddItem("2", "Siyah (2x)");
+		menu.AddItem("3", "Yeşil (7x)");
 	}
 	else
 	{
-		char Item[128];
-		Panel panel = new Panel();
-		panel.SetTitle("Rulet");
-		panel.DrawText("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬");
-		Format(Item, 128, "Geçmiş: > %s < - %s - %s - %s - %s - %s - %s - %s", G1, G2, G3, G4, G5, G6, G7, G8);
-		panel.DrawText(Item);
-		Format(Item, 128, "Oyuncular: Y %d - K %d - S %d", YY, KY, SY);
-		panel.DrawText(Item);
-		panel.DrawText("▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬");
-		Format(Item, 128, "➔ Yeşil(%dx)", Yesilx.IntValue);
-		panel.DrawItem(Item, ITEMDRAW_DISABLED);
-		Format(Item, 128, "➔ Kırmızı(%dx)", Kirmizix.IntValue);
-		panel.DrawItem(Item, ITEMDRAW_DISABLED);
-		Format(Item, 128, "➔ Siyah(%dx)\n ", Siyahx.IntValue);
-		panel.DrawItem(Item, ITEMDRAW_DISABLED);
-		panel.DrawItem("➔ Kapat");
-		panel.Send(client, Panel_CallBack2, 20);
-		delete panel;
-		return Plugin_Handled;
+		menu.SetTitle("ByDexter ★ Bu tur rulet oynamışsın\nBahisler: K: %d S: %d Y: %d\nGeçmiş: %s - %s - %s - %s - %s - %s - %s - %s - %s\n ", Bahisler[0], Bahisler[1], Bahisler[2], History[8], History[7], History[6], History[5], History[4], History[3], History[2], History[1], History[0]);
+		menu.AddItem("1", "Kırmızı (2x)", ITEMDRAW_DISABLED);
+		menu.AddItem("2", "Siyah (2x)", ITEMDRAW_DISABLED);
+		menu.AddItem("3", "Yeşil (7x)", ITEMDRAW_DISABLED);
 	}
+	menu.ExitButton = true;
+	menu.Display(client, 10);
+	return Plugin_Handled;
 }
 
-public int Panel_CallBack(Menu panel, MenuAction action, int client, int item)
+public int Menu_callback(Menu menu, MenuAction action, int client, int position)
 {
-	switch (action)
+	if (action == MenuAction_Select)
 	{
-		case MenuAction_Select:
+		char Item[4];
+		menu.GetItem(position, Item, 4);
+		int item = StringToInt(Item);
+		
+		int bahis = Bahis[client][0];
+		int kredi = Store_GetClientCredits(client);
+		if (kredi >= bahis)
 		{
-			if (item != 4)
+			Bahis[client][1] = item;
+			if (item == 1)
 			{
-				if (!Block)
-				{
-					int Kredi = Store_GetClientCredits(client);
-					if (Kredi > Rulet[client])
-					{
-						RG[client] = true;
-						Store_SetClientCredits(client, Store_GetClientCredits(client) - Rulet[client]);
-						if (item == 1)
-						{
-							Log("%N Yeşile %d Kredi girdi.", client, Rulet[client]);
-							PrintToChat(client, "[SM] \x04Yeşil'e \x0E%d Kredi \x01yatırdın.", Rulet[client]);
-							YG[client] = true;
-							YY++;
-						}
-						else if (item == 2)
-						{
-							Log("%N Kırmızıya %d Kredi girdi.", client, Rulet[client]);
-							PrintToChat(client, "[SM] \x07Kırmızı'ya \x0E%d Kredi \x01yatırdın.", Rulet[client]);
-							KG[client] = true;
-							KY++;
-						}
-						else if (item == 3)
-						{
-							Log("%N Siyaha %d Kredi girdi.", client, Rulet[client]);
-							PrintToChat(client, "[SM] \x08Siyah'a \x0E%d Kredi \x01yatırdın.", Rulet[client]);
-							SG[client] = true;
-							SY++;
-						}
-					}
-					else
-					{
-						PrintToChat(client, "[SM] \x10Yeterli kredin yok, \x04mevcut kredin: %d", Kredi);
-					}
-				}
-				else
-				{
-					PrintToChat(client, "[SM] \x02Rulet şuan kapalı.");
-				}
-				
+				PrintToChat(client, "[SM] \x07Kırmızı \x01renge %d kredi bahis oynadın.", bahis);
 			}
+			else if (item == 2)
+			{
+				PrintToChat(client, "[SM] \x08Siyah \x01renge %d kredi bahis oynadın.", bahis);
+			}
+			else if (item == 3)
+			{
+				PrintToChat(client, "[SM] \x05Yeşil \x01renge %d kredi bahis oynadın.", bahis);
+			}
+			Store_SetClientCredits(client, Store_GetClientCredits(client) - bahis);
+			Bahisler[item - 1]++;
+		}
+		else
+		{
+			ReplyToCommand(client, "[SM] Bu kadar kredin bulunmuyor, kredin: %d", kredi);
 		}
 	}
+	else if (action == MenuAction_End)
+		delete menu;
 }
 
-public int Panel_CallBack2(Menu panel, MenuAction action, int client, int item)
+public Action RoundEnd(Event event, const char[] name, bool dB)
 {
-}
-
-public Action RoundEnd(Event event, const char[] name, bool db)
-{
-	if (!Mod.BoolValue)
+	for (int i = 0; i < 3; i++)
 	{
-		Block = true;
-		Log("--------------------- Rulet Açıklanacak ---------------------");
-		PrintToChatAll("[SM] \x04Rulet birazdan açıklanacak.");
-		CreateTimer(2.0, Delay, _, TIMER_FLAG_NO_MAPCHANGE);
+		Bahisler[i] = 0;
 	}
-}
-
-public Action Delay(Handle timer)
-{
-	int Cikan = GetRandomInt(1, 100);
-	if (Cikan <= 2)
+	int Renk = GetRandomInt(0, 100);
+	if (Renk >= 97)
 	{
-		Log("Rulet Yeşil Çıktı.");
-		G8 = G7;
-		G7 = G6;
-		G6 = G5;
-		G5 = G4;
-		G4 = G3;
-		G3 = G2;
-		G2 = G1;
-		G1 = "Y";
-		PrintToChatAll("[SM] \x10Rulette Kazanan Renk: \x04Yeşil");
-		PrintHintTextToAll("Rulette Kazanan Renk Yeşil");
-		LoopClients(i)
+		PrintToChatAll("[SM] Rulette \x05Yeşil \x01renk çıktı.");
+		for (int i = 0; i != 8; i++)
 		{
-			if (RG[i])
-			{
-				if (YG[i])
-				{
-					Log("%N Yeşil katladı %d kredi kazandı", i, Rulet[i] * Yesilx.IntValue);
-					Store_SetClientCredits(i, Store_GetClientCredits(i) + Rulet[i] * Yesilx.IntValue);
-					ClientCommand(i, "play misc/store_roulette/winner.mp3");
-					PrintToChat(i, "[SM] \x04Yeşilden \x0E%d Kredi \x01kazandın.", Rulet[i] * Yesilx.IntValue);
-				}
-				else
-				{
-					Log("%N Yeşile girmediği için %d kredi kaybetti", i, Rulet[i]);
-					PrintToChat(i, "[SM] \x0E%d Kredi \x07Kaybettin.", Rulet[i]);
-				}
-			}
+			History[i] = History[i + 1];
 		}
+		for (int i = 1; i <= MaxClients; i++)if (IsValidClient(i))
+		{
+			if (Bahis[i][1] == 3)
+			{
+				Store_SetClientCredits(i, Store_GetClientCredits(i) + Bahis[i][0] * 7);
+				PrintToChat(i, "[SM] Ruleti doğru bildin \x06%d\x01 kredi kazandın", Bahis[i][0] * 7);
+			}
+			Bahis[i][0] = 0;
+			Bahis[i][1] = 0;
+		}
+		History[8] = "Y";
 	}
-	else if (Cikan <= 51)
+	else if (Renk % 2 == 0)
 	{
-		Log("Rulet Kırmızı Çıktı.");
-		G8 = G7;
-		G7 = G6;
-		G6 = G5;
-		G5 = G4;
-		G4 = G3;
-		G3 = G2;
-		G2 = G1;
-		G1 = "K";
-		PrintToChatAll("[SM] \x10Rulette Kazanan Renk: \x07Kırmızı");
-		PrintHintTextToAll("Rulette Kazanan Renk Kırmızı");
-		LoopClients(i)
+		PrintToChatAll("[SM] Rulette \x07Kırmızı \x01renk çıktı.");
+		for (int i = 0; i < 9; i++)
 		{
-			if (RG[i])
-			{
-				if (KG[i])
-				{
-					Log("%N Kırmızı katladı %d kredi kazandı", i, Rulet[i] * Kirmizix.IntValue);
-					Store_SetClientCredits(i, Store_GetClientCredits(i) + Rulet[i] * Kirmizix.IntValue);
-					ClientCommand(i, "play misc/store_roulette/winner.mp3");
-					PrintToChat(i, "[SM] \x07Kırmızıdan \x0E%d Kredi \x01kazandın.", Rulet[i] * Kirmizix.IntValue);
-				}
-				else
-				{
-					Log("%N Kırmızıya girmediği için %d kredi kaybetti", i, Rulet[i]);
-					PrintToChat(i, "[SM] \x0E%d Kredi \x07Kaybettin.", Rulet[i]);
-				}
-			}
+			History[i] = History[i + 1];
 		}
+		for (int i = 1; i <= MaxClients; i++)if (IsValidClient(i))
+		{
+			if (Bahis[i][1] == 1)
+			{
+				Store_SetClientCredits(i, Store_GetClientCredits(i) + Bahis[i][0] * 2);
+				PrintToChat(i, "[SM] Ruleti doğru bildin \x06%d\x01 kredi kazandın", Bahis[i][0] * 2);
+			}
+			Bahis[i][0] = 0;
+			Bahis[i][1] = 0;
+		}
+		History[8] = "K";
 	}
 	else
 	{
-		Log("Rulet Siyah Çıktı.");
-		G8 = G7;
-		G7 = G6;
-		G6 = G5;
-		G5 = G4;
-		G4 = G3;
-		G3 = G2;
-		G2 = G1;
-		G1 = "S";
-		PrintToChatAll("[SM] \x10Rulette Kazanan Renk: \x08Siyah");
-		PrintHintTextToAll("Rulette Kazanan Renk Siyah");
-		LoopClients(i)
+		PrintToChatAll("[SM] Rulette \x08Siyah \x01renk çıktı.");
+		for (int i = 0; i < 9; i++)
 		{
-			if (RG[i])
-			{
-				if (SG[i])
-				{
-					Log("%N Siyah katladı %d kredi kazandı", i, Rulet[i] * Siyahx.IntValue);
-					Store_SetClientCredits(i, Store_GetClientCredits(i) + Rulet[i] * Siyahx.IntValue);
-					ClientCommand(i, "play misc/store_roulette/winner.mp3");
-					PrintToChat(i, "[SM] \x08Siyahtan \x0E%d Kredi \x01kazandın.", Rulet[i] * Siyahx.IntValue);
-				}
-				else
-				{
-					Log("%N Siyah girmediği için %d kredi kaybetti", i, Rulet[i]);
-					PrintToChat(i, "[SM] \x0E%d Kredi \x07Kaybettin.", Rulet[i]);
-				}
-			}
+			History[i] = History[i + 1];
 		}
-	}
-	LoopClients(i)
-	{
-		Rulet[i] = 0;
-		YG[i] = false, KG[i] = false, SG[i] = false, RG[i] = false;
-	}
-	YY = 0, KY = 0, SY = 0;
-	if (Mod.BoolValue)
-	{
-		Log("--------------------- Rulet Başladı ---------------------");
-		Block = false;
-		Zamanlayici = CreateTimer(Timeri.FloatValue - 10.0, Duyur, _, TIMER_FLAG_NO_MAPCHANGE);
-	}
-	return Plugin_Stop;
-}
-
-public Action RoundStart(Event event, const char[] name, bool db)
-{
-	if (!Mod.BoolValue)
-	{
-		Log("--------------------- Rulet Başladı ---------------------");
-		Block = false;
+		for (int i = 1; i <= MaxClients; i++)if (IsValidClient(i))
+		{
+			if (Bahis[i][1] == 2)
+			{
+				Store_SetClientCredits(i, Store_GetClientCredits(i) + Bahis[i][0] * 2);
+				PrintToChat(i, "[SM] Ruleti doğru bildin \x06%d\x01 kredi kazandın", Bahis[i][0] * 2);
+			}
+			Bahis[i][0] = 0;
+			Bahis[i][1] = 0;
+		}
+		History[8] = "S";
 	}
 }
 
-void SetCvar(char[] cvarName, int value)
+bool IsValidClient(int client, bool nobots = true)
 {
-	ConVar IntCvar = FindConVar(cvarName);
-	if (IntCvar == null)return;
-	
-	int flags = IntCvar.Flags;
-	flags &= ~FCVAR_NOTIFY;
-	IntCvar.Flags = flags;
-	IntCvar.IntValue = value;
-	
-	flags |= FCVAR_NOTIFY;
-	IntCvar.Flags = flags;
-}
-
-void Log(const char[] buffer, any...)
-{
-	char Dosya[256];
-	FormatTime(Dosya, 256, "%d_%b_%Y", GetTime());
-	char log[256];
-	VFormat(log, 256, buffer, 2);
-	Format(Dosya, 256, "addons/sourcemod/logs/rulet/%s.log", Dosya);
-	LogToFileEx(Dosya, log);
-}
-
-void TimerKapat()
-{
-	if (Zamanlayici != null)
+	if (client <= 0 || client > MaxClients || !IsClientConnected(client) || (nobots && IsFakeClient(client)))
 	{
-		delete Zamanlayici;
-		Zamanlayici = null;
+		return false;
 	}
-}
-
-bool PrecacheSoundAny(const char[] szPath, bool preload = false)
-{
-	bool g_bNeedsFakePrecache = false;
-	EngineVersion g_engineversion = GetEngineVersion();
-	if (g_engineversion == Engine_CSGO || g_engineversion == Engine_DOTA)
-	{
-		g_bNeedsFakePrecache = true;
-	}
-	if (g_bNeedsFakePrecache)
-	{
-		return FakePrecacheSoundEx(szPath);
-	}
-	else
-	{
-		return PrecacheSound(szPath, preload);
-	}
-}
-
-static bool FakePrecacheSoundEx(const char[] szPath)
-{
-	char szPathStar[256];
-	Format(szPathStar, sizeof(szPathStar), "*%s", szPath);
-	
-	AddToStringTable(FindStringTable("soundprecache"), szPathStar);
-	return true;
+	return IsClientInGame(client);
 } 
