@@ -25,8 +25,8 @@ public void OnPluginStart()
 	{
 		SetConVarInt(FindConVar("mp_round_restart_delay"), 3, true, false);
 	}
-	min_bahis = CreateConVar("sm_rulet_min_bahis", "50", "En az rulette kaç kredi oynansın", 0, true, 1.0);
-	max_bahis = CreateConVar("sm_rulet_max_bahis", "300", "En fazla rulette kaç kredi oynansın", 0, true, 1.0);
+	min_bahis = CreateConVar("sm_rulet_min_bahis", "100", "En az rulette kaç kredi oynansın", 0, true, 1.0);
+	max_bahis = CreateConVar("sm_rulet_max_bahis", "2500", "En fazla rulette kaç kredi oynansın", 0, true, 1.0);
 	RegConsoleCmd("sm_rulet", Command_Rulet, "");
 	HookEvent("round_end", RoundEnd);
 	AutoExecConfig(true, "ByDexter", "Rulet");
@@ -89,14 +89,14 @@ public Action Command_Rulet(int client, int args)
 		menu.SetTitle("ByDexter ★ Rulet\nBahisler: K: %d S: %d Y: %d\nBahisin: %d\nGeçmiş: %s - %s - %s - %s - %s - %s - %s - %s - %s\n ", Bahisler[0], Bahisler[1], Bahisler[2], bahis, History[8], History[7], History[6], History[5], History[4], History[3], History[2], History[1], History[0]);
 		menu.AddItem("1", "Kırmızı (2x)");
 		menu.AddItem("2", "Siyah (2x)");
-		menu.AddItem("3", "Yeşil (7x)");
+		menu.AddItem("3", "Yeşil (14x)");
 	}
 	else
 	{
 		menu.SetTitle("ByDexter ★ Rulet\nBahisler: K: %d S: %d Y: %d\nGeçmiş: %s - %s - %s - %s - %s - %s - %s - %s - %s\n ", Bahisler[0], Bahisler[1], Bahisler[2], History[8], History[7], History[6], History[5], History[4], History[3], History[2], History[1], History[0]);
 		menu.AddItem("1", "Kırmızı (2x)", ITEMDRAW_DISABLED);
 		menu.AddItem("2", "Siyah (2x)", ITEMDRAW_DISABLED);
-		menu.AddItem("3", "Yeşil (7x)", ITEMDRAW_DISABLED);
+		menu.AddItem("3", "Yeşil (14x)", ITEMDRAW_DISABLED);
 	}
 	menu.ExitButton = true;
 	menu.Display(client, 10);
