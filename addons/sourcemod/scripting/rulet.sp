@@ -9,7 +9,7 @@ public Plugin myinfo =
 	name = "Rulet", 
 	author = "ByDexter", 
 	description = "", 
-	version = "1.0", 
+	version = "1.1", 
 	url = "https://steamcommunity.com/id/ByDexterTR - ByDexter#5494"
 };
 
@@ -26,7 +26,7 @@ public void OnPluginStart()
 		SetConVarInt(FindConVar("mp_round_restart_delay"), 3, true, false);
 	}
 	min_bahis = CreateConVar("sm_rulet_min_bahis", "50", "En az rulette kaç kredi oynansın", 0, true, 1.0);
-	max_bahis = CreateConVar("sm_rulet_max_bahis", "150", "En fazla rulette kaç kredi oynansın", 0, true, 1.0);
+	max_bahis = CreateConVar("sm_rulet_max_bahis", "300", "En fazla rulette kaç kredi oynansın", 0, true, 1.0);
 	RegConsoleCmd("sm_rulet", Command_Rulet, "");
 	HookEvent("round_end", RoundEnd);
 	AutoExecConfig(true, "ByDexter", "Rulet");
@@ -57,7 +57,7 @@ public void OnClientPostAdminCheck(int client)
 public Action Command_Rulet(int client, int args)
 {
 	bool Oynat = true;
-	if (Bahis[client][1] > 0)
+	if (Bahis[client][1] > 0 || args == 0)
 	{
 		Oynat = false;
 	}
@@ -86,14 +86,14 @@ public Action Command_Rulet(int client, int args)
 		
 		Bahis[client][0] = bahis;
 		
-		menu.SetTitle("ByDexter ★ Rulet\nBahisler: K: %d S: %d Y: %d\nBahisin: %d\nGeçmiş: %s - %s - %s - %s - %s - %s - %s - %s - %s\n ", bahis, Bahisler[0], Bahisler[1], Bahisler[2], History[8], History[7], History[6], History[5], History[4], History[3], History[2], History[1], History[0]);
+		menu.SetTitle("ByDexter ★ Rulet\nBahisler: K: %d S: %d Y: %d\nBahisin: %d\nGeçmiş: %s - %s - %s - %s - %s - %s - %s - %s - %s\n ", Bahisler[0], Bahisler[1], Bahisler[2], bahis, History[8], History[7], History[6], History[5], History[4], History[3], History[2], History[1], History[0]);
 		menu.AddItem("1", "Kırmızı (2x)");
 		menu.AddItem("2", "Siyah (2x)");
 		menu.AddItem("3", "Yeşil (7x)");
 	}
 	else
 	{
-		menu.SetTitle("ByDexter ★ Bu tur rulet oynamışsın\nBahisler: K: %d S: %d Y: %d\nGeçmiş: %s - %s - %s - %s - %s - %s - %s - %s - %s\n ", Bahisler[0], Bahisler[1], Bahisler[2], History[8], History[7], History[6], History[5], History[4], History[3], History[2], History[1], History[0]);
+		menu.SetTitle("ByDexter ★ Rulet\nBahisler: K: %d S: %d Y: %d\nGeçmiş: %s - %s - %s - %s - %s - %s - %s - %s - %s\n ", Bahisler[0], Bahisler[1], Bahisler[2], History[8], History[7], History[6], History[5], History[4], History[3], History[2], History[1], History[0]);
 		menu.AddItem("1", "Kırmızı (2x)", ITEMDRAW_DISABLED);
 		menu.AddItem("2", "Siyah (2x)", ITEMDRAW_DISABLED);
 		menu.AddItem("3", "Yeşil (7x)", ITEMDRAW_DISABLED);
@@ -118,18 +118,20 @@ public int Menu_callback(Menu menu, MenuAction action, int client, int position)
 			Bahis[client][1] = item;
 			if (item == 1)
 			{
+				Bahisler[0]++;
 				PrintToChat(client, "[SM] \x07Kırmızı \x01renge %d kredi bahis oynadın.", bahis);
 			}
 			else if (item == 2)
 			{
+				Bahisler[1]++;
 				PrintToChat(client, "[SM] \x08Siyah \x01renge %d kredi bahis oynadın.", bahis);
 			}
 			else if (item == 3)
 			{
+				Bahisler[2]++;
 				PrintToChat(client, "[SM] \x05Yeşil \x01renge %d kredi bahis oynadın.", bahis);
 			}
 			Store_SetClientCredits(client, Store_GetClientCredits(client) - bahis);
-			Bahisler[item - 1]++;
 		}
 		else
 		{
@@ -150,7 +152,7 @@ public Action RoundEnd(Event event, const char[] name, bool dB)
 	if (Renk >= 97)
 	{
 		PrintToChatAll("[SM] Rulette \x05Yeşil \x01renk çıktı.");
-		for (int i = 0; i != 8; i++)
+		for (int i = 0; i < 8; i++)
 		{
 			History[i] = History[i + 1];
 		}
@@ -169,7 +171,7 @@ public Action RoundEnd(Event event, const char[] name, bool dB)
 	else if (Renk % 2 == 0)
 	{
 		PrintToChatAll("[SM] Rulette \x07Kırmızı \x01renk çıktı.");
-		for (int i = 0; i < 9; i++)
+		for (int i = 0; i < 8; i++)
 		{
 			History[i] = History[i + 1];
 		}
@@ -188,7 +190,7 @@ public Action RoundEnd(Event event, const char[] name, bool dB)
 	else
 	{
 		PrintToChatAll("[SM] Rulette \x08Siyah \x01renk çıktı.");
-		for (int i = 0; i < 9; i++)
+		for (int i = 0; i < 8; i++)
 		{
 			History[i] = History[i + 1];
 		}
